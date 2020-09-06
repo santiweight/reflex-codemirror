@@ -10,6 +10,7 @@ module Reflex.CodeMirror ( module Reflex.CodeMirror.Types
                          ) where
 import "base"             Control.Monad.IO.Class (MonadIO, liftIO)
 import "base"             Data.IORef (IORef, newIORef, writeIORef, readIORef)
+import "lens"             Control.Lens ((^.))
 import "text"             Data.Text (Text)
 import "jsaddle"          Language.Javascript.JSaddle -- (JSVal) --  GHCJS.Types (JSVal)
 import "reflex-dom"       Reflex.Dom hiding (setValue)
@@ -97,12 +98,15 @@ codemirror configuration textE scrollToE = do
                     -> JSM ()
         onFirstTime element_ ref trigger configuration_ mText mScrollTo = do
             ref_ <- fromTextArea element_ configuration_
+            case configuration_ ^. configuration_value of
+                Nothing -> pure ()
+                Just startTxt -> setValueAndRefresh ref_ startTxt
             liftIO $ writeIORef ref (Just ref_)
             registerOnChange ref_
                              (onChangeCallback trigger)
             case mText of
                 Nothing -> return ()
-                Just text_ -> setValue ref_ text_
+                Just text_ -> setValueAndRefresh ref_ text_
             case mScrollTo of
                 Nothing       -> return ()
                 Just scrollTo_ -> scrollIntoView ref_ scrollTo_ 200
@@ -122,7 +126,7 @@ codemirror configuration textE scrollToE = do
         onNextTime ref_ _ mText mScrollTo = do
             case mText of
                 Nothing -> return ()
-                Just text_ -> setValue ref_ text_
+                Just text_ -> setValueAndRefresh ref_ text_
             case mScrollTo of
                 Nothing        -> return ()
                 Just scrollTo_ -> scrollIntoView ref_ scrollTo_ 200

@@ -1,6 +1,7 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE JavaScriptFFI #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
 module Reflex.CodeMirror.FFI where
 
 import "lens"      Control.Lens hiding (element, (#))
@@ -9,6 +10,7 @@ import "aeson"     Data.Aeson (toJSON)
 import "jsaddle"   Language.Javascript.JSaddle
 import             GHCJS.DOM.Element (IsElement, toElement, unElement)
 import             Reflex.CodeMirror.Types
+import Control.Monad (void)
 
 newtype CodeMirrorRef = CodeMirrorRef
                       { unCodeMirrorRef :: JSVal
@@ -40,22 +42,26 @@ registerOnChange codeMirrorRef callback = do
         x <- codemirror ^. js0 "getValue"
         t <- valToText x
         -- _ <- valToText =<< codemirror ^. js0 "getValue"
-        callback t
-        return ()
-        )
+        callback t)
     return ()
 
-
-setValue :: CodeMirrorRef
-         -- ^ ref
-         -> Text
-         -- ^ value
-         -> JSM ()
-setValue ref text = do
-    codemirror <- valToObject . unCodeMirrorRef $ ref
-    --js_text <- toJSON $ text
-    _ <- codemirror ^. js1 "setValue" text
-    return ()
+setValueAndRefresh :: CodeMirrorRef
+                   -- ^ ref
+                   -> Text
+                    -- ^ value
+                     -> JSM ()
+setValueAndRefresh ref text = do
+        codemirror <- valToObject . unCodeMirrorRef $ ref
+        setValue codemirror
+        refreshMirror codemirror
+    where
+        setValue :: Object -> JSM ()
+        setValue codemirror = void $ codemirror ^. js1 "setValue" text
+        refreshMirror :: Object -> JSM ()
+        refreshMirror codemirror = do
+            let refreshFun = fun (\_ _ _ -> void $ codemirror ^. js0 "refresh")
+            _ <- jsg2 "setTimeout" refreshFun (1 :: Double)
+            return ()
 
 scrollIntoView :: CodeMirrorRef
                -- ^ ref
