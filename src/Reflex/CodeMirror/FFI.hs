@@ -60,7 +60,7 @@ setValueAndRefresh ref text = do
         refreshMirror :: Object -> JSM ()
         refreshMirror codemirror = do
             let refreshFun = fun (\_ _ _ -> void $ codemirror ^. js0 "refresh")
-            _ <- jsg2 "setTimeout" refreshFun (1 :: Double)
+            _ <- jsg2 "setTimeout" refreshFun (100 :: Double)
             return ()
 
 scrollIntoView :: CodeMirrorRef
