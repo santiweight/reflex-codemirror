@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-dodgy-exports #-}
 module Reflex.CodeMirror ( module Reflex.CodeMirror.Types
                          , module Reflex.CodeMirror.FFI
@@ -12,7 +13,7 @@ import "base"             Control.Monad.IO.Class (MonadIO, liftIO)
 import "base"             Data.IORef (IORef, newIORef, writeIORef, readIORef)
 import "lens"             Control.Lens ((^.))
 import "text"             Data.Text (Text)
-import "jsaddle"          Language.Javascript.JSaddle -- (JSVal) --  GHCJS.Types (JSVal)
+import "jsaddle"          Language.Javascript.JSaddle
 import "reflex-dom"       Reflex.Dom hiding (setValue)
 import                    GHCJS.DOM.Element hiding (scrollIntoView) -- (IsElement)
 import                    Reflex.CodeMirror.FFI
@@ -31,13 +32,18 @@ codemirror :: forall t m.
            => Configuration
            -> Event t Text
            -> Event t (Maybe LineChar)
+           -> Event t [Mark]
            -> m (Event t Text)
-codemirror configuration textE scrollToE = do
+codemirror configuration textE scrollToE marksE = do
     -- HTML element
     (element_, _) <- el' "textarea" $ text $ maybe "" id (_configuration_value configuration)
 
     -- local state
     (ref :: IORef (Maybe CodeMirrorRef)) <- liftIO $ newIORef Nothing
+
+    jsCtx <- askJSM
+    marksArray <- liftIO $ flip runJSM jsCtx $ CMMarks <$> array @[Int] []
+    marksRef :: IORef CMMarks <- liftIO . newIORef $ marksArray
 
     -- input event
     (postBuildTaggedE :: Event t ()) <- getPostBuild
@@ -51,13 +57,18 @@ codemirror configuration textE scrollToE = do
     (outE :: Event t Text, triggerOut) <- newTriggerEvent
 
     -- handle input event
-    ctxRef <- askJSM
-    performEvent_ $ ffor inputE $ \(mText, mScrollTo) -> flip runJSM ctxRef $ handle (_element_raw element_)
+    jsCtx' <- askJSM
+    performEvent_ $ ffor inputE $ \(mText, mScrollTo) -> flip runJSM jsCtx' $ handle (_element_raw element_)
                                                              ref
                                                              triggerOut
                                                              configuration
                                                              mText
                                                              mScrollTo
+
+    -- handle marks event
+    jsCtx'' <- askJSM
+    performEvent_ $ ffor marksE (\marks -> flip runJSM jsCtx'' $ handleMarks ref marksRef marks)
+
     return outE
 
     where
@@ -81,6 +92,21 @@ codemirror configuration textE scrollToE = do
                 Nothing   -> onFirstTime element_ ref trigger configuration_ mText mScrollTo
                 Just ref_ -> onNextTime  ref_                 configuration_ mText mScrollTo
 
+        handleMarks :: IORef (Maybe CodeMirrorRef)
+                    -- ^ Local state
+                    -> IORef CMMarks
+                    -- ^ Active Marks state
+                    -> [Mark]
+                    -- ^ Marks to activate
+                    -> JSM ()
+        handleMarks ref marksRef marks = do
+            currentRef_ <- liftIO $ readIORef ref
+            marksArr <- liftIO $ readIORef marksRef
+            case currentRef_ of
+                Nothing   -> pure ()
+                Just ref_ -> do
+                    newMarks <- setMarks ref_ marksArr marks
+                    liftIO $ writeIORef marksRef $ CMMarks newMarks
 
         onFirstTime :: (IsElement el)
                     => el

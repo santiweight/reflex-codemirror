@@ -3,11 +3,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Reflex.CodeMirror.Types.Types where
 
-import "base"  GHC.Generics (Generic)
-import "base"  Data.Data (Data)
-import "base"  Data.Typeable (Typeable)
-import "aeson" Data.Aeson (Value)
-import "text"  Data.Text (Text)
+import "base"       GHC.Generics (Generic)
+import "base"       Data.Data (Data)
+import "base"       Data.Typeable (Typeable)
+import "aeson"      Data.Aeson (Value)
+import "text"       Data.Text (Text)
+import "containers" Data.Map (Map)
+import "jsaddle"    Language.Javascript.JSaddle
 
 
 data Configuration
@@ -49,3 +51,8 @@ data LineChar
     { _lineChar_line :: !Int
     , _lineChar_char :: !Int
     } deriving (Show, Read, Eq, Data, Typeable, Generic)
+
+data Mark = Mark { startPos :: !LineChar, endPos :: !LineChar, options :: Maybe (Map Text JSVal) }
+
+instance Show Mark where
+    show (Mark start end _) = "Mark{start=" <> show start <> ",end=" <> show end <> "}"

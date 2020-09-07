@@ -19,11 +19,13 @@ executable reflex-codemirror-exe
   ghc-options: -threaded
   build-depends:
       base >=4.7 && <5
+    , containers
     , lens
     , time
     , text
     , data-default
     , aeson
+    , jsaddle
     , bytestring
     , reflex-dom
     , reflex-utils

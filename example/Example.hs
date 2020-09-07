@@ -1,16 +1,21 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
+
 module Main where
 
-import                     Prelude hiding (head)
-import "lens"              Control.Lens
-import "data-default"      Data.Default (def)
-import "aeson"             Data.Aeson (toJSON, Value(..))
-import "text"              Data.Text (Text, pack)
-import "reflex-dom"        Reflex.Dom
-import "reflex-utils"      Reflex.Utils
-import "reflex-codemirror" Reflex.CodeMirror
+import                               Prelude hiding (head)
+import           "base"              Data.Functor
+import qualified "containers"        Data.Map as Map
+import           "lens"              Control.Lens
+import           "data-default"      Data.Default (def)
+import           "aeson"             Data.Aeson (toJSON, Value(..))
+import           "text"              Data.Text (Text, pack)
+import           "reflex-dom"        Reflex.Dom
+import           "reflex-utils"      Reflex.Utils
+import           "reflex-codemirror" Reflex.CodeMirror
+import           "jsaddle"           Language.Javascript.JSaddle -- (JSVal) --  GHCJS.Types (JSVal)
 
 --
 main :: IO ()
@@ -37,11 +42,21 @@ head = do
 --
 body :: MonadWidget t m => m ()
 body = do
+    marks1ButtonE <- button "push marks 1"
+    let marks1E = marks1ButtonE $>
+               [ Mark (LineChar 0 2) (LineChar 0 3) (Just $ "css" =: (jsval @JSString "color: blue"))
+               , Mark (LineChar 1 2) (LineChar 1 3) (Just $ Map.singleton "css" $ jsval @JSString "color: red")
+               ]
+    marks2ButtonE <- button "push marks 2"
+    let marks2E = marks2ButtonE $>
+               [ Mark (LineChar 1 0) (LineChar 1 1) (Just $ "css" =: (jsval @JSString "color: green"))
+               , Mark (LineChar 2 1) (LineChar 2 2) (Just $ Map.singleton "css" $ jsval @JSString "color: purple")
+               ]
     clickE <- button "goto line 3"
     let lineCharE = (Just $ LineChar 3 1) <$ clickE
     click2E <- button "change text"
     let textE = ("from event" <$ click2E)
-    textE <- codemirror config textE lineCharE
+    textE <- codemirror config textE lineCharE (leftmost $ [marks1E, marks2E])
     textD <- holdDyn "" textE
     display textD
     where
